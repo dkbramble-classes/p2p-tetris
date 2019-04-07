@@ -2,6 +2,12 @@
 "tetris -- a brand new game written in python by Alfe"
 
 import sys, random, time, select, os, termios
+import tetris_server
+import threading
+
+host_server = tetris_server.serverRun()
+srv = threading.Thread(target=host_server.run, daemon = True)
+srv.start()
 
 width = 10
 height = 27
@@ -45,7 +51,7 @@ quit  = 'quit'
 shaft = None
 next_box = None
 
-def play_tetris():  
+def play_tetris():
     initialize_shaft()
     next_block = get_next(blocks[0])
     previous_block = next_block
@@ -53,7 +59,7 @@ def play_tetris():
         block = next_block
         next_block = get_next(previous_block)
         previous_block = next_block
-        coordinates = (width/2-1, 6)  # in the middle at the top
+        coordinates = (int(width/2-1), 6)  # in the middle at the top
         if not place_block(block, coordinates, blue):  # collision already?
             return  # game is lost!
         next_fall_time = time.time() + fall_delay()
@@ -69,7 +75,7 @@ def play_tetris():
                 except Timeout:  # no command given
                     raise Fall()
                 else:  # no exception, so process command:
-                    if   command == left:
+                    if  command == left:
                         new_coordinates = (x-1, y)
                         new_block = block
                     elif command == right:
@@ -94,7 +100,7 @@ def play_tetris():
                         place_block(block, coordinates, blue)
                         # ignore the command which could not be executed
                         # maybe beep here or something ;->
-            except Fall:  
+            except Fall:
                 # make the block fall automatically:
                 new_coordinates = (x, y+1)
                 next_fall_time = time.time() + fall_delay()
@@ -109,35 +115,35 @@ def play_tetris():
 class Timeout(Exception):  pass
 class    Fall(Exception):  pass
 
-def remove_full_lines():               
+def remove_full_lines():
     global shaft, width, height
-    def line_full(line):  
+    def line_full(line):
         global width
         for x in range(width):
             if line[x] == empty:
                 return False
         return True
-    
-    def remove_line(y):   
+
+    def remove_line(y):
         global shaft, width
         del shaft[y]  # cut out line
         shaft.insert(0, [ empty ] * width)  # fill up with an empty line
-    
-    for y in range(height):  
+
+    for y in range(height):
         if line_full(shaft[y]):
             remove_line(y)
 
-def fall_delay():                      
+def fall_delay():
     return 1.3  # cheap version; implement raising difficulty here
 
-def turn_block(block):                 
+def turn_block(block):
     "return a turned copy(!) of the given block"
     result = []
     for x, y in block:
         result.append((y, -x))
     return result
 
-def get_command(next_fall_time):       
+def get_command(next_fall_time):
     "if a command is entered, return it; otherwise raise the exception Timeout"
     while True:  # until a timeout occurs or a command is found:
         timeout = next_fall_time - time.time()
@@ -148,20 +154,21 @@ def get_command(next_fall_time):
         if sys.stdin not in r:  # not input on stdin?
             raise Timeout()
         key = os.read(sys.stdin.fileno(), 1)
-        if   key == 'a':
+        if  key.decode("utf-8") == 'j':
             return left
-        elif key == 'd':
+        elif key.decode("utf-8") == 'l':
             return right
-        elif key == ' ':
+        elif key.decode("utf-8") == 'k':
             return turn
-        elif key == 's':
+        elif key.decode("utf-8") == ' ':
             return down
-        elif key == 'q':
+        elif key.decode("utf-8") == 'q':
+            print("Come again!")
             return quit
         else:  # any other key:  ignore
             pass
 
-def place_block(block, coordinates, color):  
+def place_block(block, coordinates, color):
     "if the given block can be placed in the shaft at the given coordinates"\
     " then place it there and return True; return False otherwise and do not"\
     " place anything"
@@ -190,8 +197,7 @@ def get_next(prev_block):
         shaft[y+2][x+2] = blue
     return block
 
-
-def remove_block(block, coordinates):  
+def remove_block(block, coordinates):
     global shaft
     block_x, block_y = coordinates
     for stone_x, stone_y in block:
@@ -199,13 +205,13 @@ def remove_block(block, coordinates):
         y = block_y + stone_y
         shaft[y][x] = empty
 
-def get_random_block():                
+def get_random_block():
     # if random.randint(1, 10) == 1:
     #     return random.choice(blocks)
     return random.choice(blocks)
 
-def initialize_shaft():                
-    global width, height, shaft, empty, next_height, next_width
+def initialize_shaft():
+    global width, height, shaft, empty
     shaft = [ None ] * height
     for y in range(height):
         shaft[y] = [ empty ] * width
@@ -213,7 +219,7 @@ def initialize_shaft():
     for y in range(next_height):
         next_box[y] = [ empty ] * next_width
 
-def print_shaft():                     
+def print_shaft():
     # cursor-goto top left corner:
     sys.stdout.write(home)
     for y in range(height):  
@@ -229,11 +235,11 @@ def print_shaft():
             sys.stdout.write('|\n')
         else:
             sys.stdout.write('\n')
-    
+
     # print bottom:
     sys.stdout.write('|' + floor * width + '|\n')
 
-def prepare_tty():                       
+def prepare_tty():
     "set the terminal in char mode (return each keyboard press at once) and"\
     " switch off echoing of this input; return the original settings"
     stdin_fd = sys.stdin.fileno()  # will most likely be 0  ;->
@@ -261,7 +267,7 @@ def prepare_tty():
                       [ iflag, oflag, cflag, lflag, ispeed, ospeed, cc ])
     return (stdin_fd, old_stdin_config)
 
-def cleanup_tty(original_tty_settings):  
+def cleanup_tty(original_tty_settings):
     "restore the original terminal settings"
     stdin_fd, old_stdin_config = original_tty_settings
     termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_stdin_config)
@@ -273,5 +279,3 @@ try:  # ensure that tty will be reset in the end
 finally:
     cleanup_tty(original_tty_settings)
 
-def startConnection():
-    print("Would you like to play with a friend? (yes or no)")
