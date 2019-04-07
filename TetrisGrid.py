@@ -4,10 +4,12 @@
 import sys, random, time, select, os, termios
 
 width = 10
-height = 22
+height = 27
+next_width = width + 10
+next_height = 8
 
 blocks = [ [ (0,0), (0,1),  (0,-1),  (1,0)  ],  # T
-           [ (0,0), (0,1),  (0,2),   (0,-1) ],  # I
+           [ (0,0), (1,0),  (2,0),   (-1,0) ],  # I
            [ (0,0), (0,1),  (1,1),  (-1,0)  ],  # S
            [ (0,0), (0,-1), (1,-1), (-1,0)  ],  # Z
            [ (0,0), (0,1),  (1,1),   (1,0)  ],  # O
@@ -41,12 +43,17 @@ down  = 'down'
 quit  = 'quit'
 
 shaft = None
+next_box = None
 
 def play_tetris():  
     initialize_shaft()
+    next_block = get_next(blocks[0])
+    previous_block = next_block
     while True:  # until game is lost
-        block = get_random_block()
-        coordinates = (width/2-1, 1)  # in the middle at the top
+        block = next_block
+        next_block = get_next(previous_block)
+        previous_block = next_block
+        coordinates = (width/2-1, 6)  # in the middle at the top
         if not place_block(block, coordinates, blue):  # collision already?
             return  # game is lost!
         next_fall_time = time.time() + fall_delay()
@@ -80,6 +87,7 @@ def play_tetris():
                     if place_block(new_block, new_coordinates,
                                    blue):  # command ok?
                         # execute the command:
+
                         block       = new_block
                         coordinates = new_coordinates
                     else:
@@ -140,13 +148,13 @@ def get_command(next_fall_time):
         if sys.stdin not in r:  # not input on stdin?
             raise Timeout()
         key = os.read(sys.stdin.fileno(), 1)
-        if   key == 'j':
+        if   key == 'a':
             return left
-        elif key == 'l':
+        elif key == 'd':
             return right
-        elif key == 'k':
-            return turn
         elif key == ' ':
+            return turn
+        elif key == 's':
             return down
         elif key == 'q':
             return quit
@@ -174,6 +182,15 @@ def place_block(block, coordinates, color):
         shaft[y][x] = color
     return True
 
+def get_next(prev_block):
+    for x, y in prev_block:
+        shaft[y+2][x+2] = empty
+    block = get_random_block()
+    for x, y in block:
+        shaft[y+2][x+2] = blue
+    return block
+
+
 def remove_block(block, coordinates):  
     global shaft
     block_x, block_y = coordinates
@@ -183,63 +200,38 @@ def remove_block(block, coordinates):
         shaft[y][x] = empty
 
 def get_random_block():                
-    if random.randint(1, 10) == 1:
-        return perfect_block() or random.choice(blocks)
+    # if random.randint(1, 10) == 1:
+    #     return random.choice(blocks)
     return random.choice(blocks)
 
-def perfect_block():
-    result = []
-    for y in range(height):
-        if filter(lambda b: b != empty, shaft[y]):  # found summit
-            random_order = range(width)
-            random.shuffle(random_order)
-            for x in random_order:
-                if shaft[y][x] == empty:  # found space besides summit
-                    for x_ in range(width-x):  # fill to the right
-                        if shaft[y][x+x_] != empty:
-                            break
-                        for y_ in range(height-y):
-                            if shaft[y+y_][x+x_] == empty:
-                                result.append((x_, y_))
-                            else:
-                                break
-                    for x_ in range(-1, -x-1, -1):  # fill to the left
-                        if shaft[y][x+x_] != empty:
-                            break
-                        for y_ in range(height-y):
-                            if shaft[y+y_][x+x_] == empty:
-                                result.append((x_, y_))
-                            else:
-                                break
-                    # shift block in x direction to center it:
-                    xmin = min(map(lambda v: v[0], result))
-                    xmax = max(map(lambda v: v[0], result))
-                    return map(lambda v: (v[0]-(xmax+xmin)/2, v[1]), result)
-    return None
-
 def initialize_shaft():                
-    global width, height, shaft, empty
+    global width, height, shaft, empty, next_height, next_width
     shaft = [ None ] * height
     for y in range(height):
         shaft[y] = [ empty ] * width
+    next_box = [None] * next_height
+    for y in range(next_height):
+        next_box[y] = [ empty ] * next_width
 
 def print_shaft():                     
     # cursor-goto top left corner:
     sys.stdout.write(home)
     for y in range(height):  
-        if y > 3:  # does this line have a border?  (the topmost ones do not)
-            sys.stdout.write(']')
+        if y == 0:
+            sys.stdout.write('Next Block:')
+        if y > 7:  # does this line have a border?  (the topmost ones do not)
+            sys.stdout.write('|')
         else:
             sys.stdout.write(' ')
         for x in range(width):
             sys.stdout.write(shaft[y][x])
-        if y > 3:  # does this line have a border?  (the topmost ones do not)
-            sys.stdout.write('[\n')
+        if y > 7:  # does this line have a border?  (the topmost ones do not)
+            sys.stdout.write('|\n')
         else:
             sys.stdout.write('\n')
     
     # print bottom:
-    sys.stdout.write(']' + floor * width + '[\n')
+    sys.stdout.write('|' + floor * width + '|\n')
 
 def prepare_tty():                       
     "set the terminal in char mode (return each keyboard press at once) and"\
@@ -280,3 +272,6 @@ try:  # ensure that tty will be reset in the end
     play_tetris()
 finally:
     cleanup_tty(original_tty_settings)
+
+def startConnection():
+    print("Would you like to play with a friend? (yes or no)")
