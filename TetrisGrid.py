@@ -15,8 +15,20 @@ blocks = [ [ (0,0), (0,1),  (0,-1),  (1,0)  ],  # T
            [ (0,0), (1,1),  (-1,0),  (1,0)  ],  # J
            ]
 
+colors = [
+(0, 0, 0),
+(255, 85, 85),
+(100, 200, 115),
+(120, 108, 245) ]
+
 inverted     = '\033[7;1m'
 blue         = '\033[7;34m'
+green        = '\033[7;32m'
+red          = '\033[7;31m'
+yellow       = '\033[7;33m'
+purple       = '\033[7;35m'
+cyan         = '\033[7;36m'
+white        = '\033[7;37m'
 normal       = '\033[0m'
 clear_screen = '\033[2J'  # clear the screen
 home         = '\033[H'   # goto top left corner of the screen
@@ -32,8 +44,13 @@ BLACK = '\u001b[30;1m'
 empty = '  '
 black = inverted + '  ' + normal  # two inverted spaces
 blue  = blue     + '  ' + normal  # two inverted spaces
+red   = red      + '  ' + normal
+green = green    + '  ' + normal
+yellow= yellow   + '  ' + normal
+purple= purple   + '  ' + normal
+cyan  = cyan     + '  ' + normal
+white = white    + '  ' + normal
 floor = '=='
-
 left  = 'left'
 right = 'right'
 turn  = 'turn'
@@ -46,8 +63,27 @@ def play_tetris():
     initialize_shaft()
     while True:  # until game is lost
         block = get_random_block()
+        
+    
+        if block == [ (0,0), (0,1), (0, -1), (1,0) ]: 
+            blockColor = purple
+        elif block == [ (0,0), (0,1), (0,2),   (0,-1)]:
+            blockColor = cyan
+        elif block == [ (0,0), (0,1), (1,1),   (-1,0)]:
+            blockColor = red
+        elif block == [ (0,0), (0,-1), (1,-1), (-1,0)]:
+            blockColor = green
+        elif block == [ (0,0), (0,1), (1,1),    (1,0)]:
+            blockColor = yellow
+        #elif block == [ (0,0), (-1,1), (-1,0)  (1,0)]:
+           # blockColor == blue
+        elif block == [ (0,0), (1,1),  (-1,0),   (1,0)]:
+            blockColor = blue
+        else:
+            blockColor = white
+
         coordinates = (width/2-1, 1)  # in the middle at the top
-        if not place_block(block, coordinates, blue):  # collision already?
+        if not place_block(block, coordinates, blockColor):  # collision already?
             return  # game is lost!
         next_fall_time = time.time() + fall_delay()
         # ^^^ this is the time when the block will fall automatically
@@ -78,23 +114,23 @@ def play_tetris():
                     else:
                         raise Exception("internal error: %r" % command)
                     if place_block(new_block, new_coordinates,
-                                   blue):  # command ok?
+                                   blockColor):  # command ok?
                         # execute the command:
                         block       = new_block
                         coordinates = new_coordinates
                     else:
-                        place_block(block, coordinates, blue)
+                        place_block(block, coordinates, blockColor)
                         # ignore the command which could not be executed
                         # maybe beep here or something ;->
             except Fall:  
                 # make the block fall automatically:
                 new_coordinates = (x, y+1)
                 next_fall_time = time.time() + fall_delay()
-                if place_block(block, new_coordinates, blue):  # can be placed?
+                if place_block(block, new_coordinates, blockColor):  # can be placed?
                     coordinates = new_coordinates
                 else:
                     place_block(block, coordinates,
-                                black)  # place block there again
+                                blockColor)  # place block there again
                     break               # and bail out
         remove_full_lines()
 
