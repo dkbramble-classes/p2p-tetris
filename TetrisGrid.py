@@ -11,8 +11,6 @@ srv.start()
 
 width = 10
 height = 27
-next_width = width + 10
-next_height = 8
 
 blocks = [ [ (0,0), (0,1),  (0,-1),  (1,0)  ],  # T
            [ (0,0), (1,0),  (2,0),   (-1,0) ],  # I
@@ -49,7 +47,6 @@ down  = 'down'
 quit  = 'quit'
 
 shaft = None
-next_box = None
 
 def play_tetris():
     initialize_shaft()
@@ -215,9 +212,6 @@ def initialize_shaft():
     shaft = [ None ] * height
     for y in range(height):
         shaft[y] = [ empty ] * width
-    next_box = [None] * next_height
-    for y in range(next_height):
-        next_box[y] = [ empty ] * next_width
 
 def print_shaft():
     # cursor-goto top left corner:
