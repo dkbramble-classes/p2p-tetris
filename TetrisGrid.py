@@ -2,7 +2,7 @@
 "tetris -- a brand new game written in python by Alfe"
 
 import sys, random, time, select, os, termios
-import tetris_server
+#import tetris_server
 import threading
 import requests, socket
 
@@ -280,64 +280,101 @@ def joinGame():
     global hostname
     global URL
     joinwait = True
-    playerStatus = 'join'
+    errorcount = 0
     hostname = input("What is the hostname / ip address of the other player?\n")
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Trying to connect to ' + hostname + '...\n')
     URL = "http://" + hostname #get hostname for centralized server
-    timeout = time.time() + 15
+    playerStatus = 'join'
+    timeout = time.time() + 30
+    countdown = 0.0
     while joinwait:
-        #joinwait = False
-        r = requests.post(URL, data="Join_user2") #CHANGE LATER
-        if r.text == "CONNECTED":
-            print("We've connected!")
-            joinwait = False
+        try:
+            r = requests.post(URL, data=playerStatus, timeout = 1)
+            if float(r.text) > time.time():
+                joinwait = False
+                countdown = float(r.text)
+        except requests.exceptions.ConnectionError:
+            if errorcount == 0:
+                print("Still searching for host")
+            errorcount = 1
+
         if timeout < time.time():
-            print('Couldn''t find a host player, please try again later \n')
+            print('No host player found, please try again later\n')
             joinwait = False
             timeout = -1
+            try:
+                playerStatus = 'joinreset'
+                r = requests.post("http://localhost", data=playerStatus)
+            except requests.exceptions.ConnectionError:
+                print("")
     if timeout != -1:
         menuGo = False
         original_tty_settings = prepare_tty()  # switch off line buffering etc.
-        os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
+            while countdown > time.time():
+                print("Host found, playing game in " + str(int(countdown - time.time())) + " seconds")
+                time.sleep(1)
+            os.system('cls' if os.name == 'nt' else 'clear')
             play_tetris()
         finally:
             cleanup_tty(original_tty_settings)
+            try:
+                playerStatus = 'joinreset'
+                r = requests.post("http://localhost", data=playerStatus)
+            except requests.exceptions.ConnectionError:
+                print("")
 def hostGame():
+    global playerStatus
     global menuGo
     global URL
     global playerStatus
     hostwait = True
+    errorcount = 0
     playerStatus = 'host'
     hostname = socket.gethostname()
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Hosting a game, waiting for a player to join...\n')
-    host_server = tetris_server.serverRun()
-    srv = threading.Thread(target=host_server.run, daemon = True)
-    srv.start()
-    URL = "http://" + hostname
-    r = requests.post(URL, data="Join_" + hostname)
-    timeout = time.time() + 15
+    # srv = threading.Thread(target=tetris_server.run(), daemon = True)
+    # srv.start()
+    timeout = time.time() + 30
+    countdown = 0.0
     while hostwait:
-        #hostwait = False
-        q = requests.post(URL, data="Check")
-        print("q.text is: " + q.text)
-        if q.text == "True":
-            print("Player Found! Starting game")
-            hostwait = False
+        try:
+            r = requests.post("http://localhost", data=playerStatus, timeout = 1)
+            if float(r.text) > time.time():
+                hostwait = False
+                countdown = float(r.text)
+        except requests.exceptions.ConnectionError:
+            if errorcount == 0:
+                print("Still searching for other players")
+            errorcount = 1
+
         if timeout < time.time():
             print('No other players connected, please try again later\n')
             hostwait = False
             timeout = -1
+            try:
+                playerStatus = 'hostreset'
+                r = requests.post("http://localhost", data=playerStatus)
+            except requests.exceptions.ConnectionError:
+                print("")
     if timeout != -1:
         menuGo = False
         original_tty_settings = prepare_tty()  # switch off line buffering etc.
-        os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
+            while countdown > time.time():
+                print("Player found, playing game in " + str(int(countdown - time.time())) + " seconds")
+                time.sleep(1)
+            os.system('cls' if os.name == 'nt' else 'clear')
             play_tetris()
         finally:
             cleanup_tty(original_tty_settings)
+            try:
+                playerStatus = 'hostreset'
+                r = requests.post("http://localhost", data=playerStatus)
+            except requests.exceptions.ConnectionError:
+                print("")
 def menu():
     global menuGo
     #print the logo
