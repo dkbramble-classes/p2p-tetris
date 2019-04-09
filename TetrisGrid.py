@@ -4,11 +4,10 @@
 import sys, random, time, select, os, termios
 import tetris_server
 import threading
+import requests
 
-host_server = tetris_server.serverRun()
-srv = threading.Thread(target=host_server.run, daemon = True)
-srv.start()
-
+playerStatus = ''
+menuGo = True
 width = 10
 height = 27
 
@@ -216,7 +215,7 @@ def initialize_shaft():
 def print_shaft():
     # cursor-goto top left corner:
     sys.stdout.write(home)
-    for y in range(height):  
+    for y in range(height):
         if y == 0:
             sys.stdout.write('Next Block:')
         if y > 7:  # does this line have a border?  (the topmost ones do not)
@@ -266,10 +265,76 @@ def cleanup_tty(original_tty_settings):
     stdin_fd, old_stdin_config = original_tty_settings
     termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_stdin_config)
 
-original_tty_settings = prepare_tty()  # switch off line buffering etc.
-sys.stdout.write(clear_screen)
-try:  # ensure that tty will be reset in the end
-    play_tetris()
-finally:
-    cleanup_tty(original_tty_settings)
+def joinGame():
+    global playerStatus
+    global menuGo
+    joinwait = True
+    playerStatus = 'join'
+    hostname = input("What is the hostname / ip address of the other player?\n")
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print('Trying to connect to ' + hostname + '...\n')
+    URL = "http://" + hostname #get hostname for centralized server
+    timeout = time.time() + 15
+    while joinwait:
+        joinwait = False
+        if timeout < time.time():
+            print('Couldn''t find a host player, please try again later \n')
+            joinwait = False
+            timeout = -1
+    if timeout != -1:
+        menuGo = False
+        original_tty_settings = prepare_tty()  # switch off line buffering etc.
+        os.system('cls' if os.name == 'nt' else 'clear')
+        try:# ensure that tty will be reset in the end
+            play_tetris()
+        finally:
+            cleanup_tty(original_tty_settings)
+def hostGame():
+    global menuGo
+    hostwait = True
+    playerStatus = 'host'
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print('Hosting a game, waiting for a player to join...\n')
+    host_server = tetris_server.serverRun()
+    srv = threading.Thread(target=host_server.run, daemon = True)
+    srv.start()
+    timeout = time.time() + 15
+    while hostwait:
+        hostwait = False
+        if timeout < time.time():
+            print('No other players connected, please try again later\n')
+            hostwait = False
+            timeout = -1
+    if timeout != -1:
+        menuGo = False
+        original_tty_settings = prepare_tty()  # switch off line buffering etc.
+        os.system('cls' if os.name == 'nt' else 'clear')
+        try:# ensure that tty will be reset in the end
+            play_tetris()
+        finally:
+            cleanup_tty(original_tty_settings)
+def menu():
+    global menuGo
+    #print the logo
+    print(RED + "MMMMMM" + WHITE + " MMMMMM" + YELLOW + "  MMMMMM" + GREEN + " MMMML" + BLUE + "  MMMMM" + PURPLE + " MMMMMM")
+    print(RED + "  MM" + WHITE + "   MM" + YELLOW + "        MM" + GREEN + "   M   M" + BLUE + "    M" + PURPLE + "   MM")
+    print(RED + "  MM" + WHITE + "   MMMM" + YELLOW + "      MM" + GREEN + "   MMMMP" + BLUE + "    M" + PURPLE + "   MMMMMM")
+    print(RED + "  MM" + WHITE + "   MM" + YELLOW + "        MM" + GREEN + "   M  M" + BLUE + "     M" + PURPLE + "       MM")
+    print(RED + "  MM" + WHITE + "   MM" + YELLOW + "        MM" + GREEN + "   M   M" + BLUE + "    M" + PURPLE + "       MM")
+    print(RED + "  MM" + WHITE + "   MMMMMM" + YELLOW + "    MM" + GREEN + "   M    M" + BLUE + " MMMMM" + PURPLE + " MMMMMM\n" + WHITE)
+    print("Welcome!\n\nTo start a game you'll need another player.")
+    while menuGo == True:
+        text = input("Would you like to host or join a game (Type 'host' for host, 'join' for join, and 'quit' for quit)\n")
+        if  text.lower() == 'join':
+            joinGame()
+        elif text.lower() == 'host':
+            hostGame()
+        elif text.lower() == 'quit':
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("Goodbye!")
+            menuGo = False
+        else:
+            print(text + " is not a valid option, please type either 'host' or 'join'\n")
 
+os.system('cls' if os.name == 'nt' else 'clear')
+menu()
