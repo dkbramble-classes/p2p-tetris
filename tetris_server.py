@@ -11,8 +11,8 @@ import threading
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
 
-userInfo = {}
-userFiles = {}
+playerBoards = {}
+
 class Database(BaseHTTPRequestHandler):
 
     def _set_headers(self):
@@ -24,24 +24,15 @@ class Database(BaseHTTPRequestHandler):
         #this is the function for the search command. Dane will use requests.get(url = URL, params = PARAMS) to request information
         query = urlparse(self.path).query
         searchStr = str(query)
-        search = searchStr.split("=")
+        userName = searchStr.split("=")
         x = 0
         response = {}
-        for username in userFiles:
-            for file in userFiles[username]:
-                if search[1].lower() in userFiles[username][file].lower():
-                    response[x] = {
-                        "hostname": userInfo[username]["hostname"],
-                        "connection": userInfo[username]["connection"],
-                        "file": file,
-                        "description": userFiles[username][file]
-                    }
-                    x += 1
-                    print("File: " + file + " with Description: \"" + userFiles[username][file] + "\" found for search result.")
-
+        for player in playerBoards:
+            if player != userName:
+                board = playerBoards[player]
         self.send_response(200)
         self.end_headers()
-        responseStr = json.dumps(response)
+        responseStr = json.dumps(board)
         self.wfile.write(responseStr.encode("utf-8"))
         # testResponse = "SEARCHED"
         # self.wfile.write(testResponse.encode("utf-8"))
@@ -57,11 +48,8 @@ class Database(BaseHTTPRequestHandler):
         parsedBody = strBody.split("_")
         # If the information is about a user, store the username with the hostname and connection as a smaller dictionary
         # This worked: curl -d "User_username2_hostname_connection" http://Lukes-MacBook-Pro-2.local
-        if parsedBody[0] == "User":
-            userInfo[parsedBody[1]] = {
-                "hostname": parsedBody[2],
-                "connection": parsedBody[3]
-            }
+        if parsedBody[0] == "Join":
+            playerBoards[parsedBody[1]] = {}
             self.send_response(200)
             self.end_headers()
             response = "CONNECTED"
@@ -70,7 +58,12 @@ class Database(BaseHTTPRequestHandler):
         #Otherwise if the information is for a file, store the file name and descritpion as a list of dictionaries under the username
         #The JSON text that we send here to the server needs to have escape characters
         # This worked: curl -d "File_Dane_{\"local_server.py\":\"Insert Description Here\",\"ftp_client.py\":\"Look, More Descriptions\",\"client_gui.py\":\"DESCRIPTIONS\" }" http://Lukes-MacBook-Pro-2.local
-        elif parsedBody[0] == "File":
+        elif parsedBody[0] == "Check":
+            self.send_response(200)
+            self.end_headers()
+            response = str((len(playerBoards) >= 2))
+            self.wfile.write(response.encode("utf-8"))
+        elif parsedBody[0] == "Info":
             jsonString = parsedBody[2]
             for x in range(3, len(parsedBody)):
                 jsonString += "_" + str(parsedBody[x])
@@ -87,8 +80,7 @@ class Database(BaseHTTPRequestHandler):
             self.wfile.write(response.encode("utf-8"))
         #Return information as JSON payload
         elif parsedBody[0] == "Quit":
-            userInfo.pop(parsedBody[1])
-            userFiles.pop(parsedBody[1])
+            playerBoards.pop(parsedBody[1])
             self.send_response(200)
             self.end_headers()
             response = "DELETED"

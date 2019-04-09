@@ -4,9 +4,11 @@
 import sys, random, time, select, os, termios
 import tetris_server
 import threading
-import requests
+import requests, socket
 
 playerStatus = ''
+hostname = ''
+URL = ''
 menuGo = True
 width = 10
 height = 27
@@ -262,12 +264,21 @@ def prepare_tty():
 
 def cleanup_tty(original_tty_settings):
     "restore the original terminal settings"
+    global URL, hostname
+    if playerStatus == 'join':
+        r = requests.post(URL, data="Quit_user2") #CHANGE LATER
+    if playerStatus == 'host':
+        r = requests.post(URL, data="Quit_" + hostname) #CHANGE LATER
+
+
     stdin_fd, old_stdin_config = original_tty_settings
     termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_stdin_config)
 
 def joinGame():
     global playerStatus
     global menuGo
+    global hostname
+    global URL
     joinwait = True
     playerStatus = 'join'
     hostname = input("What is the hostname / ip address of the other player?\n")
@@ -276,7 +287,11 @@ def joinGame():
     URL = "http://" + hostname #get hostname for centralized server
     timeout = time.time() + 15
     while joinwait:
-        joinwait = False
+        #joinwait = False
+        r = requests.post(URL, data="Join_user2") #CHANGE LATER
+        if r.text == "CONNECTED":
+            print("We've connected!")
+            joinwait = False
         if timeout < time.time():
             print('Couldn''t find a host player, please try again later \n')
             joinwait = False
@@ -291,16 +306,26 @@ def joinGame():
             cleanup_tty(original_tty_settings)
 def hostGame():
     global menuGo
+    global URL
+    global playerStatus
     hostwait = True
     playerStatus = 'host'
+    hostname = socket.gethostname()
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Hosting a game, waiting for a player to join...\n')
     host_server = tetris_server.serverRun()
     srv = threading.Thread(target=host_server.run, daemon = True)
     srv.start()
+    URL = "http://" + hostname
+    r = requests.post(URL, data="Join_" + hostname)
     timeout = time.time() + 15
     while hostwait:
-        hostwait = False
+        #hostwait = False
+        q = requests.post(URL, data="Check")
+        print("q.text is: " + q.text)
+        if q.text == "True":
+            print("Player Found! Starting game")
+            hostwait = False
         if timeout < time.time():
             print('No other players connected, please try again later\n')
             hostwait = False
