@@ -123,7 +123,7 @@ def remove_full_lines():
     def remove_line(y):
         global shaft, width
         del shaft[y]  # cut out line
-        shaft.insert(0, [ empty ] * width)  # fill up with an empty line
+        shaft.insert(5, [ empty ] * width)  # fill up with an empty line
 
     for y in range(height):
         if line_full(shaft[y]):
