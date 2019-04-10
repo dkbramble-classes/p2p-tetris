@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 "tetris -- a brand new game written in python by Alfe"
 
-import sys, random, time, select, os, termios
+import random, time, select, os, termios
+from random import randrange as rand
+import pygame, sys
 #import tetris_server
 import threading
 import requests, socket
@@ -10,24 +12,6 @@ playerStatus = ''
 hostname = ''
 URL = ''
 menuGo = True
-width = 10
-height = 27
-
-blocks = [ [ (0,0), (0,1),  (0,-1),  (1,0)  ],  # T
-           [ (0,0), (1,0),  (2,0),   (-1,0) ],  # I
-           [ (0,0), (0,1),  (1,1),  (-1,0)  ],  # S
-           [ (0,0), (0,-1), (1,-1), (-1,0)  ],  # Z
-           [ (0,0), (0,1),  (1,1),   (1,0)  ],  # O
-           [ (0,0), (-1,1), (-1,0),  (1,0)  ],  # L
-           [ (0,0), (1,1),  (-1,0),  (1,0)  ],  # J
-           ]
-
-inverted     = '\033[7;1m'
-blue         = '\033[7;34m'
-normal       = '\033[0m'
-clear_screen = '\033[2J'  # clear the screen
-home         = '\033[H'   # goto top left corner of the screen
-# (the latter two were found using 'clear | od -c')
 PURPLE = '\033[95m'
 BLUE = '\033[94m'
 GREEN = '\033[92m'
@@ -35,244 +19,235 @@ YELLOW = '\033[93m'
 RED = '\033[91m'
 WHITE = '\033[0m'
 BLACK = '\u001b[30;1m'
+# The configuration
+config = {
+	'cell_size':	20,
+	'cols':		8,
+	'rows':		16,
+	'delay':	750,
+	'maxfps':	30
+}
 
-empty = '  '
-black = inverted + '  ' + normal  # two inverted spaces
-blue  = blue     + '  ' + normal  # two inverted spaces
-floor = '=='
+colors = [
+(0,   0,   0  ),
+(255, 0,   0  ),
+(0,   150, 0  ),
+(0,   0,   255),
+(255, 120, 0  ),
+(255, 255, 0  ),
+(180, 0,   255),
+(0,   220, 220)
+]
 
-left  = 'left'
-right = 'right'
-turn  = 'turn'
-down  = 'down'
-quit  = 'quit'
+# Define the shapes of the single parts
+tetris_shapes = [
+	[[1, 1, 1],
+	 [0, 1, 0]],
 
-shaft = None
+	[[0, 2, 2],
+	 [2, 2, 0]],
 
-def play_tetris():
-    initialize_shaft()
-    next_block = get_next(blocks[0])
-    previous_block = next_block
-    while True:  # until game is lost
-        block = next_block
-        next_block = get_next(previous_block)
-        previous_block = next_block
-        coordinates = (int(width/2-1), 6)  # in the middle at the top
-        if not place_block(block, coordinates, blue):  # collision already?
-            return  # game is lost!
-        next_fall_time = time.time() + fall_delay()
-        # ^^^ this is the time when the block will fall automatically
-        #     one line down
-        while True:  # until block is placed fixedly
-            print_shaft()
-            remove_block(block, coordinates)
-            x, y = coordinates
-            try:
-                try:
-                    command = get_command(next_fall_time)
-                except Timeout:  # no command given
-                    raise Fall()
-                else:  # no exception, so process command:
-                    if  command == left:
-                        new_coordinates = (x-1, y)
-                        new_block = block
-                    elif command == right:
-                        new_coordinates = (x+1, y)
-                        new_block = block
-                    elif command == turn:
-                        new_coordinates = (x, y)
-                        new_block = turn_block(block)
-                    elif command == down:
-                        raise Fall()
-                    elif command == quit:
-                        return
-                    else:
-                        raise Exception("internal error: %r" % command)
-                    if place_block(new_block, new_coordinates,
-                                   blue):  # command ok?
-                        # execute the command:
+	[[3, 3, 0],
+	 [0, 3, 3]],
 
-                        block       = new_block
-                        coordinates = new_coordinates
-                    else:
-                        place_block(block, coordinates, blue)
-                        # ignore the command which could not be executed
-                        # maybe beep here or something ;->
-            except Fall:
-                # make the block fall automatically:
-                new_coordinates = (x, y+1)
-                next_fall_time = time.time() + fall_delay()
-                if place_block(block, new_coordinates, blue):  # can be placed?
-                    coordinates = new_coordinates
-                else:
-                    place_block(block, coordinates,
-                                black)  # place block there again
-                    break               # and bail out
-        remove_full_lines()
+	[[4, 0, 0],
+	 [4, 4, 4]],
 
-class Timeout(Exception):  pass
-class    Fall(Exception):  pass
+	[[0, 0, 5],
+	 [5, 5, 5]],
 
-def remove_full_lines():
-    global shaft, width, height
-    def line_full(line):
-        global width
-        for x in range(width):
-            if line[x] == empty:
-                return False
-        return True
+	[[6, 6, 6, 6]],
 
-    def remove_line(y):
-        global shaft, width
-        del shaft[y]  # cut out line
-        shaft.insert(5, [ empty ] * width)  # fill up with an empty line
+	[[7, 7],
+	 [7, 7]]
+]
 
-    for y in range(height):
-        if line_full(shaft[y]):
-            remove_line(y)
+def rotate_clockwise(shape):
+	return [ [ shape[y][x]
+			for y in range(len(shape)) ]
+		for x in range(len(shape[0]) - 1, -1, -1) ]
 
-def fall_delay():
-    return 1.3  # cheap version; implement raising difficulty here
+def check_collision(board, shape, offset):
+	off_x, off_y = offset
+	for cy, row in enumerate(shape):
+		for cx, cell in enumerate(row):
+			try:
+				if cell and board[ cy + off_y ][ cx + off_x ]:
+					return True
+			except IndexError:
+				return True
+	return False
 
-def turn_block(block):
-    "return a turned copy(!) of the given block"
-    result = []
-    for x, y in block:
-        result.append((y, -x))
-    return result
+def remove_row(board, row):
+	del board[row]
+	return [[0 for i in range(config['cols'])]] + board
 
-def get_command(next_fall_time):
-    "if a command is entered, return it; otherwise raise the exception Timeout"
-    while True:  # until a timeout occurs or a command is found:
-        timeout = next_fall_time - time.time()
-        if timeout > 0.0:
-            (r, w, e) = select.select([ sys.stdin ], [], [], timeout)
-        else:
-            raise Timeout()
-        if sys.stdin not in r:  # not input on stdin?
-            raise Timeout()
-        key = os.read(sys.stdin.fileno(), 1)
-        if  key.decode("utf-8") == 'j':
-            return left
-        elif key.decode("utf-8") == 'l':
-            return right
-        elif key.decode("utf-8") == 'k':
-            return turn
-        elif key.decode("utf-8") == ' ':
-            return down
-        elif key.decode("utf-8") == 'q':
-            print("Come again!")
-            return quit
-        else:  # any other key:  ignore
-            pass
+def join_matrixes(mat1, mat2, mat2_off):
+	off_x, off_y = mat2_off
+	for cy, row in enumerate(mat2):
+		for cx, val in enumerate(row):
+			mat1[cy+off_y-1	][cx+off_x] += val
+	return mat1
 
-def place_block(block, coordinates, color):
-    "if the given block can be placed in the shaft at the given coordinates"\
-    " then place it there and return True; return False otherwise and do not"\
-    " place anything"
-    global shaft, width, height
-    block_x, block_y = coordinates
-    for stone_x, stone_y in block:
-        x = block_x + stone_x
-        y = block_y + stone_y
-        if (x < 0 or x >= width or
-            y < 0 or y >= height or  # border collision?
-            shaft[y][x] != empty):   # block collision?
-            return False  # cannot be placed there
-    # reached here?  ==> can be placed there
-    # now really place it:
-    for stone_x, stone_y in block:
-        x = block_x + stone_x
-        y = block_y + stone_y
-        shaft[y][x] = color
-    return True
+def new_board():
+	board = [ [ 0 for x in range(config['cols']) ]
+			for y in range(config['rows']) ]
+	board += [[ 1 for x in range(config['cols'])]]
+	return board
 
-def get_next(prev_block):
-    for x, y in prev_block:
-        shaft[y+2][x+2] = empty
-    block = get_random_block()
-    for x, y in block:
-        shaft[y+2][x+2] = blue
-    return block
+class TetrisApp(object):
+	def __init__(self):
+		pygame.init()
+		pygame.key.set_repeat(250,25)
+		self.width = config['cell_size']*config['cols']
+		self.height = config['cell_size']*config['rows']
 
-def remove_block(block, coordinates):
-    global shaft
-    block_x, block_y = coordinates
-    for stone_x, stone_y in block:
-        x = block_x + stone_x
-        y = block_y + stone_y
-        shaft[y][x] = empty
+		self.screen = pygame.display.set_mode((self.width, self.height))
+		pygame.event.set_blocked(pygame.MOUSEMOTION) # We do not need
+		                                             # mouse movement
+		                                             # events, so we
+		                                             # block them.
+		self.init_game()
 
-def get_random_block():
-    # if random.randint(1, 10) == 1:
-    #     return random.choice(blocks)
-    return random.choice(blocks)
+	def new_stone(self):
+		self.stone = tetris_shapes[rand(len(tetris_shapes))]
+		self.stone_x = int(config['cols'] / 2 - len(self.stone[0])/2)
+		self.stone_y = 0
 
-def initialize_shaft():
-    global width, height, shaft, empty
-    shaft = [ None ] * height
-    for y in range(height):
-        shaft[y] = [ empty ] * width
+		if check_collision(self.board,
+		                   self.stone,
+		                   (self.stone_x, self.stone_y)):
+			self.gameover = True
 
-def print_shaft():
-    # cursor-goto top left corner:
-    sys.stdout.write(home)
-    for y in range(height):
-        if y == 0:
-            sys.stdout.write('Next Block:')
-        if y > 7:  # does this line have a border?  (the topmost ones do not)
-            sys.stdout.write('|')
-        else:
-            sys.stdout.write(' ')
-        for x in range(width):
-            sys.stdout.write(shaft[y][x])
-        if y > 7:  # does this line have a border?  (the topmost ones do not)
-            sys.stdout.write('|\n')
-        else:
-            sys.stdout.write('\n')
+	def init_game(self):
+		self.board = new_board()
+		self.new_stone()
 
-    # print bottom:
-    sys.stdout.write('|' + floor * width + '|\n')
+	def center_msg(self, msg):
+		for i, line in enumerate(msg.splitlines()):
+			msg_image =  pygame.font.Font(
+				pygame.font.get_default_font(), 12).render(
+					line, False, (255,255,255), (0,0,0))
 
-def prepare_tty():
-    "set the terminal in char mode (return each keyboard press at once) and"\
-    " switch off echoing of this input; return the original settings"
-    stdin_fd = sys.stdin.fileno()  # will most likely be 0  ;->
-    old_stdin_config = termios.tcgetattr(stdin_fd)
-    [ iflag, oflag, cflag, lflag, ispeed, ospeed, cc ] = \
-        termios.tcgetattr(stdin_fd)
-    cc[termios.VTIME] = 1
-    cc[termios.VMIN] = 1
-    iflag = iflag & ~(termios.IGNBRK |
-                      termios.BRKINT |
-                      termios.PARMRK |
-                      termios.ISTRIP |
-                      termios.INLCR |
-                      termios.IGNCR |
-                      #termios.ICRNL |
-                      termios.IXON)
-    #  oflag = oflag & ~termios.OPOST
-    cflag = cflag | termios.CS8
-    lflag = lflag & ~(termios.ECHO |
-                      termios.ECHONL |
-                      termios.ICANON |
-                      # termios.ISIG |
-                      termios.IEXTEN)
-    termios.tcsetattr(stdin_fd, termios.TCSANOW,
-                      [ iflag, oflag, cflag, lflag, ispeed, ospeed, cc ])
-    return (stdin_fd, old_stdin_config)
+			msgim_center_x, msgim_center_y = msg_image.get_size()
+			msgim_center_x //= 2
+			msgim_center_y //= 2
 
-def cleanup_tty(original_tty_settings):
-    "restore the original terminal settings"
-    global URL, hostname
-    if playerStatus == 'join':
-        r = requests.post(URL, data="Quit_user2") #CHANGE LATER
-    if playerStatus == 'host':
-        r = requests.post(URL, data="Quit_" + hostname) #CHANGE LATER
+			self.screen.blit(msg_image, (
+			  self.width // 2-msgim_center_x,
+			  self.height // 2-msgim_center_y+i*22))
 
+	def draw_matrix(self, matrix, offset):
+		off_x, off_y  = offset
+		for y, row in enumerate(matrix):
+			for x, val in enumerate(row):
+				if val:
+					pygame.draw.rect(
+						self.screen,
+						colors[val],
+						pygame.Rect(
+							(off_x+x) *
+							  config['cell_size'],
+							(off_y+y) *
+							  config['cell_size'],
+							config['cell_size'],
+							config['cell_size']),0)
 
-    stdin_fd, old_stdin_config = original_tty_settings
-    termios.tcsetattr(stdin_fd, termios.TCSADRAIN, old_stdin_config)
+	def move(self, delta_x):
+		if not self.gameover and not self.paused:
+			new_x = self.stone_x + delta_x
+			if new_x < 0:
+				new_x = 0
+			if new_x > config['cols'] - len(self.stone[0]):
+				new_x = config['cols'] - len(self.stone[0])
+			if not check_collision(self.board,
+			                       self.stone,
+			                       (new_x, self.stone_y)):
+				self.stone_x = new_x
+	def quit(self):
+		self.center_msg("Exiting...")
+		pygame.display.update()
+		sys.exit()
+
+	def drop(self):
+		if not self.gameover and not self.paused:
+			self.stone_y += 1
+			if check_collision(self.board,
+			                   self.stone,
+			                   (self.stone_x, self.stone_y)):
+				self.board = join_matrixes(
+				  self.board,
+				  self.stone,
+				  (self.stone_x, self.stone_y))
+				self.new_stone()
+				while True:
+					for i, row in enumerate(self.board[:-1]):
+						if 0 not in row:
+							self.board = remove_row(
+							  self.board, i)
+							break
+					else:
+						break
+
+	def rotate_stone(self):
+		if not self.gameover and not self.paused:
+			new_stone = rotate_clockwise(self.stone)
+			if not check_collision(self.board,
+			                       new_stone,
+			                       (self.stone_x, self.stone_y)):
+				self.stone = new_stone
+
+	def toggle_pause(self):
+		self.paused = not self.paused
+
+	def start_game(self):
+		if self.gameover:
+			self.init_game()
+			self.gameover = False
+
+	def run(self):
+		key_actions = {
+			'ESCAPE':	self.quit,
+			'LEFT':		lambda:self.move(-1),
+			'RIGHT':	lambda:self.move(+1),
+			'DOWN':		self.drop,
+			'UP':		self.rotate_stone,
+			'p':		self.toggle_pause,
+			'SPACE':	self.start_game
+		}
+
+		self.gameover = False
+		self.paused = False
+
+		pygame.time.set_timer(pygame.USEREVENT+1, config['delay'])
+		dont_burn_my_cpu = pygame.time.Clock()
+		while 1:
+			self.screen.fill((0,0,0))
+			if self.gameover:
+				self.center_msg("""Game Over!
+Press space to continue""")
+			else:
+				if self.paused:
+					self.center_msg("Paused")
+				else:
+					self.draw_matrix(self.board, (0,0))
+					self.draw_matrix(self.stone,
+					                 (self.stone_x,
+					                  self.stone_y))
+			pygame.display.update()
+
+			for event in pygame.event.get():
+				if event.type == pygame.USEREVENT+1:
+					self.drop()
+				elif event.type == pygame.QUIT:
+					self.quit()
+				elif event.type == pygame.KEYDOWN:
+					for key in key_actions:
+						if event.key == eval("pygame.K_"
+						+key):
+							key_actions[key]()
+
+			dont_burn_my_cpu.tick(config['maxfps'])
 
 def joinGame():
     global playerStatus
@@ -281,6 +256,7 @@ def joinGame():
     global URL
     joinwait = True
     errorcount = 0
+    os.system('cls' if os.name == 'nt' else 'clear')
     hostname = input("What is the hostname / ip address of the other player?\n")
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Trying to connect to ' + hostname + '...\n')
@@ -310,16 +286,16 @@ def joinGame():
                 print("")
     if timeout != -1:
         menuGo = False
-        original_tty_settings = prepare_tty()  # switch off line buffering etc.
+        os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
             while countdown > time.time():
                 print("Host found, playing game in " + str(int(countdown - time.time())) + " seconds")
                 time.sleep(1)
-            os.system('cls' if os.name == 'nt' else 'clear')
-            play_tetris()
+            App = TetrisApp()
+            App.run()
         finally:
-            cleanup_tty(original_tty_settings)
             try:
+                os.system('cls' if os.name == 'nt' else 'clear')
                 playerStatus = 'joinreset'
                 r = requests.post("http://localhost", data=playerStatus)
             except requests.exceptions.ConnectionError:
@@ -361,22 +337,23 @@ def hostGame():
                 print("")
     if timeout != -1:
         menuGo = False
-        original_tty_settings = prepare_tty()  # switch off line buffering etc.
+        os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
             while countdown > time.time():
                 print("Player found, playing game in " + str(int(countdown - time.time())) + " seconds")
                 time.sleep(1)
-            os.system('cls' if os.name == 'nt' else 'clear')
-            play_tetris()
+            App = TetrisApp()
+            App.run()
         finally:
-            cleanup_tty(original_tty_settings)
             try:
+                os.system('cls' if os.name == 'nt' else 'clear')
                 playerStatus = 'hostreset'
                 r = requests.post("http://localhost", data=playerStatus)
             except requests.exceptions.ConnectionError:
                 print("")
 def menu():
     global menuGo
+    os.system('cls' if os.name == 'nt' else 'clear')
     #print the logo
     print(RED + "MMMMMM" + WHITE + " MMMMMM" + YELLOW + "  MMMMMM" + GREEN + " MMMML" + BLUE + "  MMMMM" + PURPLE + " MMMMMM")
     print(RED + "  MM" + WHITE + "   MM" + YELLOW + "        MM" + GREEN + "   M   M" + BLUE + "    M" + PURPLE + "   MM")
@@ -397,6 +374,4 @@ def menu():
             menuGo = False
         else:
             print(text + " is not a valid option, please type either 'host' or 'join'\n")
-
-os.system('cls' if os.name == 'nt' else 'clear')
 menu()
