@@ -12,8 +12,7 @@ import time
 class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
     pass
 
-userInfo = {}
-userFiles = {}
+playerBoards = {}
 joined = False
 hosted = False
 response = "0.0"
@@ -58,6 +57,11 @@ class Database(BaseHTTPRequestHandler):
             if joined and response != "0.0":
                 response = str(time.time() + 10)
             hosted = True
+            playerBoards[1] = {}
+            playerBoards[1]["board"] = []
+            playerBoards[1]["stone"] = []
+            playerBoards[1]["stone_x"] = []
+            playerBoards[1]["stone_y"] = []
             self.send_response(200)
             self.end_headers()
             self.wfile.write(response.encode("utf-8"))
@@ -66,6 +70,11 @@ class Database(BaseHTTPRequestHandler):
             if hosted and response != 0.0:
                 response = str(time.time() + 10)
             joined = True
+            playerBoards[2] = {}
+            playerBoards[2]["board"] = []
+            playerBoards[2]["stone"] = []
+            playerBoards[2]["stone_x"] = []
+            playerBoards[2]["stone_y"] = []
             self.send_response(200)
             self.end_headers()
             self.wfile.write(response.encode("utf-8"))
@@ -74,6 +83,26 @@ class Database(BaseHTTPRequestHandler):
             hosted = False
         elif strBody == 'joinreset':
             joined = False
+        elif "Info" in strBody:
+            parsedBody = strBody.split("_")
+            board = parsedBody[2]
+            stone = parsedBody[3]
+            if parsedBody[1] == "host":
+                playerBoards[1]["board"] = board
+                playerBoards[1]["stone"] = stone
+                playerBoards[1]["stone_x"] = parsedBody[4]
+                playerBoards[1]["stone_y"] = parsedBody[5]
+                opponent = json.dumps(playerBoards[2])
+            else:
+                playerBoards[2]["board"] = board
+                playerBoards[2]["stone"] = stone
+                playerBoards[2]["stone_x"] = parsedBody[4]
+                playerBoards[2]["stone_y"] = parsedBody[5]
+                opponent = json.dumps(playerBoards[1])
+
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(opponent.encode("utf-8"))
         else:
             print("Didn't receive proper request. Request given: " + strBody)
         #parsedBody = strBody.split("_")
