@@ -28,9 +28,6 @@ class Database(BaseHTTPRequestHandler):
     def do_GET(self):
         global hostWin
         global joinWin
-        #this is the function for the search command. Dane will use requests.get(url = URL, params = PARAMS) to request information
-        query = urlparse(self.path).query
-        searchStr = str(query)
         if hostWin == True:
             responseStr = 'Host wins!'
         elif joinWin == True:
@@ -40,11 +37,7 @@ class Database(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(responseStr.encode("utf-8"))
-        # testResponse = "SEARCHED"
-        # self.wfile.write(testResponse.encode("utf-8"))
-
-        #query_components = dict(qc.split("=") for qc in query.split("&"))
-
+        
 
     def do_POST(self):
         # Doesn't do anything with posted data
@@ -120,7 +113,6 @@ class Database(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(response.encode("utf-8"))
-            print("test")
         elif strBody == 'joinwin':
             if joinWin == False and hostWin == False:
                 joinWin = True
@@ -128,7 +120,6 @@ class Database(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(response.encode("utf-8"))
-            print("test")
         else:
             print("Didn't receive proper request. Request given: " + strBody)
             self.send_response(400)

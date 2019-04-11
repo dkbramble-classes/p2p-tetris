@@ -13,7 +13,6 @@ import requests, socket
 playerStatus = '' #Whether the player is hosting or joining the game
 URL = '' #The URL of the server
 menuGo = True #Whether or not the menu will display after the logo
-endStatus = ''
 
 #ASCII color codes for the logo
 PURPLE = '\033[95m'
@@ -102,14 +101,13 @@ def new_board():
 
 class TetrisApp(object):
     global URL, playerStatus 
-    global endStatus
 
     def __init__(self):
         pygame.init()
         pygame.key.set_repeat(250,25)
         self.width = config['cell_size']*config['cols'] * 2 + 3*config['cell_size']
         self.height = config['cell_size']*config['rows']
-        self.endStatus = endStatus
+        self.endStatus = ''
 
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.event.set_blocked(pygame.MOUSEMOTION) # We do not need
