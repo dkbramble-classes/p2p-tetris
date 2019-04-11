@@ -1,17 +1,19 @@
 #!/usr/bin/env python
-"tetris -- a brand new game written in python by Alfe"
-
+#This is a pygame Tetris game that connects to a centralized server and another person.
+#See the README for more information.
+#Authors: Luke Bassett, Dane Bramble, Patrik Kozak, Brendan Warnick
+#Pieces of the pygame Tetris were inspired by the Tetris game made by Kevin Chabowski
 import random, time, select, os
 from random import randrange as rand
 import pygame, sys
-#import tetris_server
 import threading
 import requests, socket
 
-playerStatus = ''
-hostname = ''
-URL = ''
-menuGo = True
+playerStatus = '' #Whether the player is hosting or joining the game
+URL = '' #The URL of the server
+menuGo = True #Whether or not the menu will display after the logo
+
+#ASCII color codes for the logo
 PURPLE = '\033[95m'
 BLUE = '\033[94m'
 GREEN = '\033[92m'
@@ -19,6 +21,7 @@ YELLOW = '\033[93m'
 RED = '\033[91m'
 WHITE = '\033[0m'
 BLACK = '\u001b[30;1m'
+
 # The configuration
 config = {
     'cell_size':    20,
@@ -248,111 +251,112 @@ Press space to continue""")
                             key_actions[key]()
 
             dont_burn_my_cpu.tick(config['maxfps'])
-
+#This function connects to the local server and waits for a connection from the other player.
+#Once the other player has connected, this function starts the Tetris game
 def joinGame():
-    global playerStatus
-    global menuGo
-    global hostname
-    global URL
-    joinwait = True
-    errorcount = 0
+    global playerStatus #Whether you host or join the game
+    global menuGo #If the player can still return to the menu
+    global URL # The URL of the server
+    joinwait = True #This boolean is True while the server seeks a connection to the server and the other player
+    errorcount = 0 #Don't print more than one error
     os.system('cls' if os.name == 'nt' else 'clear')
-    hostname = input("What is the hostname / ip address of the other player?\n")
+    hostname = input("What is the hostname / ip address of the other player?\n") #Ask the player for the name of the host
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Trying to connect to ' + hostname + '...\n')
-    URL = "http://" + hostname #get hostname for centralized server
+    URL = "http://" + hostname #get the url for the centralized server
     playerStatus = 'join'
-    timeout = time.time() + 30
-    countdown = 0.0
+    timeout = time.time() + 30 #The loop will timeout in 30 seconds
+    countdown = 0.0 #Countdown until the game starts
+	#This loops while the host is searching or it times out
     while joinwait:
         try:
-            r = requests.post(URL, data=playerStatus, timeout = 1)
-            if float(r.text) > time.time():
-                joinwait = False
-                countdown = float(r.text)
-        except requests.exceptions.ConnectionError:
+            r = requests.post(URL, data=playerStatus, timeout = 1) #Send the player status to the server, get a time stamp of when the game should start back
+            if float(r.text) > time.time(): #If the time given is greater than the current time, then the connection is active
+                joinwait = False #Stop looping
+                countdown = float(r.text)  #set the time until game start
+        except requests.exceptions.ConnectionError: # If the server cannot connect
             if errorcount == 0:
                 print("Still searching for host")
             errorcount = 1
-
-        if timeout < time.time():
+        if timeout < time.time():# If the time to search is expired
             print('No host player found, please try again later\n')
-            joinwait = False
-            timeout = -1
-            try:
+            joinwait = False #Stop looping, go back to menu
+            timeout = -1 #Status, the search timed out
+            try: #Send a message to the server that you are no longer searching for a game
                 playerStatus = 'joinreset'
                 r = requests.post("http://localhost", data=playerStatus)
-            except requests.exceptions.ConnectionError:
+            except requests.exceptions.ConnectionError: # If the server cannot connect
                 print("")
+	#if the search didn't timeout
     if timeout != -1:
         menuGo = False
         os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
-            while countdown > time.time():
+            while countdown > time.time(): #Wait until the same time to start the game
                 print("Host found, playing game in " + str(int(countdown - time.time())) + " seconds")
                 time.sleep(1)
-            App = TetrisApp()
-            App.run()
-        finally:
+            App = TetrisApp() #Create game object
+            App.run() #Start the game
+        finally: #once the game is over, reset status
             try:
                 os.system('cls' if os.name == 'nt' else 'clear')
                 playerStatus = 'joinreset'
                 r = requests.post("http://localhost", data=playerStatus)
             except requests.exceptions.ConnectionError:
                 print("")
+#This function connects to the local server and waits for a connection from the other player.
+#Once the other player has connected, this function starts the Tetris game
 def hostGame():
-    global playerStatus
-    global menuGo
-    global URL
-    global playerStatus
-    hostwait = True
-    errorcount = 0
+    global playerStatus #Whether you host or join the game
+    global menuGo #If the player can still return to the menu
+    global URL # The URL of the server
+    hostwait = True #This boolean is True while the server seeks a connection to the server and the other player
+    errorcount = 0 #Don't print more than one error
     playerStatus = 'host'
-    hostname = socket.gethostname()
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Hosting a game, waiting for a player to join...\n')
-    # srv = threading.Thread(target=tetris_server.run(), daemon = True)
-    # srv.start()
-    timeout = time.time() + 30
-    countdown = 0.0
+    timeout = time.time() + 30 #The loop will timeout in 30 seconds
+    countdown = 0.0 #Countdown until the game starts
+	#This loops while the host is searching or it times out
     while hostwait:
         try:
-            r = requests.post("http://localhost", data=playerStatus, timeout = 1)
-            if float(r.text) > time.time():
-                hostwait = False
-                countdown = float(r.text)
-        except requests.exceptions.ConnectionError:
+            r = requests.post("http://localhost", data=playerStatus, timeout = 1) #Send the player status to the server, get a time stamp of when the game should start back
+            if float(r.text) > time.time(): #If the time given is greater than the current time, then the connection is active
+                hostwait = False #Stop looping
+                countdown = float(r.text) #set the time until game start
+        except requests.exceptions.ConnectionError: # If the server cannot connect
             if errorcount == 0:
                 print("Still searching for other players")
             errorcount = 1
-
-        if timeout < time.time():
+        if timeout < time.time(): # If the time to search is expired
             print('No other players connected, please try again later\n')
-            hostwait = False
-            timeout = -1
-            try:
+            hostwait = False #Stop looping, go back to menu
+            timeout = -1 #Status, the search timed out
+            try: #Send a message to the server that you are no longer searching for a game
                 playerStatus = 'hostreset'
                 r = requests.post("http://localhost", data=playerStatus)
             except requests.exceptions.ConnectionError:
                 print("")
+	#if the search didn't timeout
     if timeout != -1:
         menuGo = False
         os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
-            while countdown > time.time():
+            while countdown > time.time(): #Wait until the same time to start the game
                 print("Player found, playing game in " + str(int(countdown - time.time())) + " seconds")
                 time.sleep(1)
-            App = TetrisApp()
-            App.run()
-        finally:
+            App = TetrisApp() #Create game object
+            App.run() #Start the game
+        finally: #Once the game is over
             try:
                 os.system('cls' if os.name == 'nt' else 'clear')
                 playerStatus = 'hostreset'
-                r = requests.post("http://localhost", data=playerStatus)
+                r = requests.post("http://localhost", data=playerStatus) #Send a message to the server that you are no longer searching for a game
             except requests.exceptions.ConnectionError:
                 print("")
+#this method is the menu for the player to use. From here the player can choose to host or join a game.
 def menu():
-    global menuGo
+    global menuGo #While this is true the menu screen will continue to ask the player to play a game
     os.system('cls' if os.name == 'nt' else 'clear')
     #print the logo
     print(RED + "MMMMMM" + WHITE + " MMMMMM" + YELLOW + "  MMMMMM" + GREEN + " MMMML" + BLUE + "  MMMMM" + PURPLE + " MMMMMM")
@@ -363,15 +367,15 @@ def menu():
     print(RED + "  MM" + WHITE + "   MMMMMM" + YELLOW + "    MM" + GREEN + "   M    M" + BLUE + " MMMMM" + PURPLE + " MMMMMM\n" + WHITE)
     print("Welcome!\n\nTo start a game you'll need another player.")
     while menuGo == True:
-        text = input("Would you like to host or join a game (Type 'host' for host, 'join' for join, and 'quit' for quit)\n")
-        if  text.lower() == 'join':
+        text = input("Would you like to host or join a game (Type 'host' for host, 'join' for join, and 'quit' for quit)\n") #prompt for a response
+        if  text.lower() == 'join': #if the player types 'join'
             joinGame()
-        elif text.lower() == 'host':
+        elif text.lower() == 'host':#if the player types 'host'
             hostGame()
-        elif text.lower() == 'quit':
+        elif text.lower() == 'quit': #if the player types 'quit', leave the game
             os.system('cls' if os.name == 'nt' else 'clear')
             print("Goodbye!")
-            menuGo = False
-        else:
+            menuGo = False #stop the menu
+        else: #if the input was not one of the above options
             print(text + " is not a valid option, please type either 'host' or 'join'\n")
-menu()
+menu() #Run the game
