@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
 #This is a pygame Tetris game that connects to a centralized server and another person.
 #See the README for more information.
 #Authors: Luke Bassett, Dane Bramble, Patrik Kozak, Brendan Warnick
 #Pieces of the pygame Tetris were inspired by the Tetris game made by Kevin Chabowski
-import random, time, select, os
+import random, time, select, os, ast, json
 from random import randrange as rand
 import pygame, sys
 import threading
@@ -99,10 +100,11 @@ def new_board():
     return board
 
 class TetrisApp(object):
+    global URL, playerStatus
     def __init__(self):
         pygame.init()
         pygame.key.set_repeat(250,25)
-        self.width = config['cell_size']*config['cols']
+        self.width = config['cell_size']*config['cols'] * 2 + 3*config['cell_size']
         self.height = config['cell_size']*config['rows']
 
         self.screen = pygame.display.set_mode((self.width, self.height))
@@ -237,6 +239,13 @@ Press space to continue""")
                     self.draw_matrix(self.stone,
                                      (self.stone_x,
                                       self.stone_y))
+                    r = requests.post(URL, "Info _" + playerStatus + "_" + str(self.board) + "_" + str(self.stone) + "_" + str(self.stone_x) + "_" + str(self.stone_y))
+                    opponent = json.loads(r.text)
+                    if isinstance(opponent["board"], str):
+                        newBoard = ast.literal_eval(opponent["board"])
+                        newStone = ast.literal_eval(opponent["stone"])
+                        self.draw_matrix(newBoard, (11,0))
+                        self.draw_matrix(newStone, ((int(opponent["stone_x"])+3+8),(int(opponent["stone_y"]))))
             pygame.display.update()
 
             for event in pygame.event.get():
@@ -251,6 +260,7 @@ Press space to continue""")
                             key_actions[key]()
 
             dont_burn_my_cpu.tick(config['maxfps'])
+
 #This function connects to the local server and waits for a connection from the other player.
 #Once the other player has connected, this function starts the Tetris game
 def joinGame():
@@ -315,6 +325,7 @@ def hostGame():
     playerStatus = 'host'
     os.system('cls' if os.name == 'nt' else 'clear')
     print('Hosting a game, waiting for a player to join...\n')
+    URL = "http://localhost"
     timeout = time.time() + 30 #The loop will timeout in 30 seconds
     countdown = 0.0 #Countdown until the game starts
 	#This loops while the host is searching or it times out
