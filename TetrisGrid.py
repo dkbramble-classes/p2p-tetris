@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 "tetris -- a brand new game written in python by Alfe"
 
-import random, time, select, os, termios
+import random, time, select, os
 from random import randrange as rand
 import pygame, sys
 #import tetris_server
