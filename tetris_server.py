@@ -15,6 +15,8 @@ class ThreadingSimpleServer(ThreadingMixIn, HTTPServer):
 playerBoards = {}
 joined = False
 hosted = False
+joinWin = False
+hostWin = False
 response = "0.0"
 class Database(BaseHTTPRequestHandler):
 
@@ -24,30 +26,25 @@ class Database(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        #this is the function for the search command. Dane will use requests.get(url = URL, params = PARAMS) to request information
-        query = urlparse(self.path).query
-        searchStr = str(query)
-        userName = searchStr.split("=")
-        x = 0
-        response = {}
-        for player in playerBoards:
-            if player != userName:
-                board = playerBoards[player]
+        global hostWin
+        global joinWin
+        if hostWin == True:
+            responseStr = 'Host wins!'
+        elif joinWin == True:
+            responseStr = 'Join wins!'
+        else:
+            responseStr = 'none'
         self.send_response(200)
         self.end_headers()
-        responseStr = json.dumps(board)
         self.wfile.write(responseStr.encode("utf-8"))
-        # testResponse = "SEARCHED"
-        # self.wfile.write(testResponse.encode("utf-8"))
-
-        #query_components = dict(qc.split("=") for qc in query.split("&"))
-
+        
 
     def do_POST(self):
         # Doesn't do anything with posted data
         global joined
         global hosted
         global response
+        global hostWin, joinWin
         content_length = int(self.headers['Content-Length'])
         body = self.rfile.read(content_length)
         strBody = str(body, 'utf-8')
@@ -57,6 +54,8 @@ class Database(BaseHTTPRequestHandler):
             if joined and response != "0.0":
                 response = str(time.time() + 10)
             hosted = True
+            hostWin = False
+            joinWin = False
             playerBoards[1] = {}
             playerBoards[1]["board"] = []
             playerBoards[1]["stone"] = []
@@ -81,8 +80,12 @@ class Database(BaseHTTPRequestHandler):
             #print("User joined.")
         elif strBody == 'hostreset':
             hosted = False
+            self.send_response(200)
+            self.end_headers()
         elif strBody == 'joinreset':
             joined = False
+            self.send_response(200)
+            self.end_headers()
         elif "Info" in strBody:
             parsedBody = strBody.split("_")
             board = parsedBody[2]
@@ -103,8 +106,24 @@ class Database(BaseHTTPRequestHandler):
             self.send_response(200)
             self.end_headers()
             self.wfile.write(opponent.encode("utf-8"))
+        elif strBody == 'hostwin':
+            if hostWin == False and joinWin == False:
+                hostWin = True
+                response = "Host wins!"
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(response.encode("utf-8"))
+        elif strBody == 'joinwin':
+            if joinWin == False and hostWin == False:
+                joinWin = True
+                response = "Join wins!"
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(response.encode("utf-8"))
         else:
             print("Didn't receive proper request. Request given: " + strBody)
+            self.send_response(400)
+            self.end_headers()
         #parsedBody = strBody.split("_")
         # If the information is about a user, store the username with the hostname and connection as a smaller dictionary
         # This worked: curl -d "User_username2_hostname_connection" http://Lukes-MacBook-Pro-2.local
