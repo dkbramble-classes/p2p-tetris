@@ -100,7 +100,7 @@ class TetrisApp(object):
     def __init__(self):
         pygame.init()
         pygame.key.set_repeat(250,25)
-        self.width = config['cell_size']*config['cols'] * 2 + 4
+        self.width = config['cell_size']*config['cols'] * 2 + 3*config['cell_size']
         self.height = config['cell_size']*config['rows']
 
         self.screen = pygame.display.set_mode((self.width, self.height))
@@ -255,7 +255,7 @@ Press space to continue""")
                         newStone = ast.literal_eval(opponent["stone"])
                         print("Stone x is :")
                         print(opponent["stone_x"])
-                        self.draw_matrix(newBoard, (10,0))
+                        self.draw_matrix(newBoard, (11,0))
                         self.draw_matrix(newStone, ((int(opponent["stone_x"])+3+8),(int(opponent["stone_y"]))))
             pygame.display.update()
 
