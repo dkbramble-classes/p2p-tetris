@@ -13,6 +13,7 @@ import requests, socket
 playerStatus = '' #Whether the player is hosting or joining the game
 URL = '' #The URL of the server
 menuGo = True #Whether or not the menu will display after the logo
+endStatus = ''
 
 #ASCII color codes for the logo
 PURPLE = '\033[95m'
@@ -100,12 +101,15 @@ def new_board():
     return board
 
 class TetrisApp(object):
-    global URL, playerStatus
+    global URL, playerStatus 
+    global endStatus
+
     def __init__(self):
         pygame.init()
         pygame.key.set_repeat(250,25)
         self.width = config['cell_size']*config['cols'] * 2 + 3*config['cell_size']
         self.height = config['cell_size']*config['rows']
+        self.endStatus = endStatus
 
         self.screen = pygame.display.set_mode((self.width, self.height))
         pygame.event.set_blocked(pygame.MOUSEMOTION) # We do not need
@@ -123,6 +127,8 @@ class TetrisApp(object):
                            self.stone,
                            (self.stone_x, self.stone_y)):
             self.gameover = True
+            r = requests.post(URL, self.endStatus)
+            self.endStatus = r.text
 
     def init_game(self):
         self.board = new_board()
@@ -223,6 +229,12 @@ class TetrisApp(object):
 
         self.gameover = False
         self.paused = False
+        if playerStatus == 'host':
+            pygame.display.set_caption('Host Game')
+            self.endStatus = 'joinwin'
+        elif playerStatus == 'join':
+            pygame.display.set_caption('Join Game')
+            self.endStatus = 'hostwin'
 
         pygame.time.set_timer(pygame.USEREVENT+1, config['delay'])
         dont_burn_my_cpu = pygame.time.Clock()
@@ -230,7 +242,7 @@ class TetrisApp(object):
             self.screen.fill((0,0,0))
             if self.gameover:
                 self.center_msg("""Game Over!
-Press space to continue""")
+ {}""".format(self.endStatus))
             else:
                 if self.paused:
                     self.center_msg("Paused")
@@ -246,6 +258,11 @@ Press space to continue""")
                         newStone = ast.literal_eval(opponent["stone"])
                         self.draw_matrix(newBoard, (11,0))
                         self.draw_matrix(newStone, ((int(opponent["stone_x"])+3+8),(int(opponent["stone_y"]))))
+                    q = requests.get(URL)
+            #print(q.text == 'none')
+                    if not q.text == 'none':
+                        self.endStatus = q.text
+                        self.gameover = True
             pygame.display.update()
 
             for event in pygame.event.get():
