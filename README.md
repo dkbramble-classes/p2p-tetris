@@ -23,6 +23,8 @@ To start, open another window in Terminal and run the command "python3 (or pytho
 This is the typical game of Tetris: Stack the blocks as best as possible, you lose when your board is filled before your opponents. The goal of this game is to stay alive the longest, so do your best!
 
 ### Controls:
-Left/Right: Left and right arrow keys
-Fast Fall: Down arrow key
-Rotate Block: Up arrow key
+- Left/Right: Left and right arrow keys
+
+- Fast Fall: Down arrow key
+
+- Rotate Block: Up arrow key
