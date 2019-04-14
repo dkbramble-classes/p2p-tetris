@@ -161,6 +161,16 @@ class TetrisApp(object):
                               config['cell_size'],
                             config['cell_size'],
                             config['cell_size']),0)
+        pygame.draw.rect(
+                        self.screen,
+                        (200,200,200),
+                        pygame.Rect(
+                            (8) *
+                              config['cell_size'],
+                            (0) *
+                              config['cell_size'],
+                            config['cell_size']*3,
+                            self.height*config['cell_size']),0)
 
     def move(self, delta_x):
         if not self.gameover and not self.paused:
