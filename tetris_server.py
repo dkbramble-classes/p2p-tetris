@@ -109,17 +109,17 @@ class Database(BaseHTTPRequestHandler):
         elif strBody == 'hostwin':
             if hostWin == False and joinWin == False:
                 hostWin = True
-                response = "Host wins!"
+                text = "Host wins!"
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(response.encode("utf-8"))
+            self.wfile.write(text.encode("utf-8"))
         elif strBody == 'joinwin':
             if joinWin == False and hostWin == False:
                 joinWin = True
-                response = "Join wins!"
+                text = "Join wins!"
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(response.encode("utf-8"))
+            self.wfile.write(text.encode("utf-8"))
         else:
             print("Didn't receive proper request. Request given: " + strBody)
             self.send_response(400)
