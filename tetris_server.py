@@ -46,6 +46,8 @@ class Database(BaseHTTPRequestHandler):
         body = self.rfile.read(content_length)
         strBody = str(body, 'utf-8')
         #parsedBody = strBody.split("_")
+        # After a server is running, a player must delcare as the host.
+        # The host is kept track of by the server.
         if strBody == 'host':
             print("host")
             if joined and response != "0.0":
@@ -62,6 +64,8 @@ class Database(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(response.encode("utf-8"))
             #print("User " + strBody + " connected to the server.")
+        # Once a host is declared, a second player must 'join' the host to play the game.
+        # Once joined, the server keeps track of this player too.
         elif strBody == 'join':
             if hosted and response != 0.0:
                 response = str(time.time() + 6)
