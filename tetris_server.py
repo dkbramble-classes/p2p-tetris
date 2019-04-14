@@ -19,12 +19,12 @@ joinWin = False
 hostWin = False
 response = "0.0"
 class Database(BaseHTTPRequestHandler):
-    
+
     def _set_headers(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
         self.end_headers()
- 
+
     def do_GET(self):
         global hostWin
         global joinWin
@@ -52,7 +52,6 @@ class Database(BaseHTTPRequestHandler):
         # After a server is running, a player must delcare as the host.
         # The host is kept track of by the server.
         if strBody == 'host':
-            print("host")
             if joined and response != "0.0":
                 response = str(time.time() + 6)
             hosted = True
@@ -132,6 +131,9 @@ class Database(BaseHTTPRequestHandler):
             print("Didn't receive proper request. Request given: " + strBody)
             self.send_response(400)
             self.end_headers()
+    #Stops response messages for the http server
+    def log_message(self, format, *args):
+        return
 #run server
 def run(server_class=HTTPServer, handler_class=Database, port=80):
     server_address = '0.0.0.0'
