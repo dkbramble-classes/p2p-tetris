@@ -100,7 +100,7 @@ def new_board():
     return board
 
 class TetrisApp(object):
-    global URL, playerStatus 
+    global URL, playerStatus
 
     def __init__(self):
         pygame.init()
@@ -317,9 +317,13 @@ def joinGame():
         menuGo = False
         os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
+            timecount = True
             while countdown > time.time(): #Wait until the same time to start the game
-                print("Host found, playing game in " + str(int(countdown - time.time())) + " seconds")
-                time.sleep(1)
+                if timecount:
+                    timecount = False
+                    print("Host found, playing game in " + str(int(countdown - time.time())) + " seconds")
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("Game Started!")
             App = TetrisApp() #Create game object
             App.run() #Start the game
         finally: #once the game is over, reset status
@@ -368,9 +372,13 @@ def hostGame():
         menuGo = False
         os.system('cls' if os.name == 'nt' else 'clear')
         try:# ensure that tty will be reset in the end
+            timecount = True
             while countdown > time.time(): #Wait until the same time to start the game
-                print("Player found, playing game in " + str(int(countdown - time.time())) + " seconds")
-                time.sleep(1)
+                if timecount:
+                    timecount = False
+                    print("Player found, playing game in " + str(int(countdown - time.time())) + " seconds")
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print("Game Started!")
             App = TetrisApp() #Create game object
             App.run() #Start the game
         finally: #Once the game is over
