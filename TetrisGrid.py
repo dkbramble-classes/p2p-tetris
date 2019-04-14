@@ -23,7 +23,7 @@ RED = '\033[91m'
 WHITE = '\033[0m'
 BLACK = '\u001b[30;1m'
 
-# The configuration
+# The initialized values for the board and options with it
 config = {
     'cell_size':    20,
     'cols':     8,
@@ -32,6 +32,7 @@ config = {
     'maxfps':   30
 }
 
+#Specified colors for each block
 colors = [
 (0,   0,   0  ),
 (255, 0,   0  ),
@@ -43,7 +44,7 @@ colors = [
 (0,   220, 220)
 ]
 
-# Define the shapes of the single parts
+# Define the shapes of the each block option
 tetris_shapes = [
     [[1, 1, 1],
      [0, 1, 0]],
@@ -66,11 +67,13 @@ tetris_shapes = [
      [7, 7]]
 ]
 
+#Rotate block
 def rotate_clockwise(shape):
     return [ [ shape[y][x]
             for y in range(len(shape)) ]
         for x in range(len(shape[0]) - 1, -1, -1) ]
 
+#Check to see if block collides with another, if so then stop it from moving
 def check_collision(board, shape, offset):
     off_x, off_y = offset
     for cy, row in enumerate(shape):
@@ -82,10 +85,12 @@ def check_collision(board, shape, offset):
                 return True
     return False
 
+#Remove the row by replacing each value with a '0' (which symbolises black)
 def remove_row(board, row):
     del board[row]
     return [[0 for i in range(config['cols'])]] + board
 
+#Adds current falling block to general board when collision happens.
 def join_matrixes(mat1, mat2, mat2_off):
     off_x, off_y = mat2_off
     for cy, row in enumerate(mat2):
@@ -93,15 +98,18 @@ def join_matrixes(mat1, mat2, mat2_off):
             mat1[cy+off_y-1 ][cx+off_x] += val
     return mat1
 
+#Resets board
 def new_board():
     board = [ [ 0 for x in range(config['cols']) ]
             for y in range(config['rows']) ]
     board += [[ 1 for x in range(config['cols'])]]
     return board
 
+#This object handles most of the Tetris objects.
 class TetrisApp(object):
     global URL, playerStatus
 
+    #Initialize dimensions and screen of the game.
     def __init__(self):
         pygame.init()
         pygame.key.set_repeat(250,25)
@@ -116,6 +124,7 @@ class TetrisApp(object):
                                                      # block them.
         self.init_game()
 
+    #Randomly gets a new stone and sets it on the top and in the middle of the board.
     def new_stone(self):
         self.stone = tetris_shapes[rand(len(tetris_shapes))]
         self.stone_x = int(config['cols'] / 2 - len(self.stone[0])/2)
@@ -123,15 +132,17 @@ class TetrisApp(object):
 
         if check_collision(self.board,
                            self.stone,
-                           (self.stone_x, self.stone_y)):
+                           (self.stone_x, self.stone_y)): #If it collides right away, the game is over
             self.gameover = True
             r = requests.post(URL, self.endStatus)
             self.endStatus = r.text
 
+    #Create new board and get a new stone
     def init_game(self):
         self.board = new_board()
         self.new_stone()
 
+    #Displays message in the center of the screen
     def center_msg(self, msg):
         for i, line in enumerate(msg.splitlines()):
             msg_image =  pygame.font.Font(
@@ -146,9 +157,10 @@ class TetrisApp(object):
               self.width // 2-msgim_center_x,
               self.height // 2-msgim_center_y+i*22))
 
+    #Draws the board, the current moving block and the border line for each frame
     def draw_matrix(self, matrix, offset):
         off_x, off_y  = offset
-        for y, row in enumerate(matrix):
+        for y, row in enumerate(matrix): #These loops draw the board and current moving block
             for x, val in enumerate(row):
                 if val:
                     pygame.draw.rect(
@@ -161,7 +173,7 @@ class TetrisApp(object):
                               config['cell_size'],
                             config['cell_size'],
                             config['cell_size']),0)
-        pygame.draw.rect(
+        pygame.draw.rect( #This draws the border line between players
                         self.screen,
                         (200,200,200),
                         pygame.Rect(
@@ -172,6 +184,7 @@ class TetrisApp(object):
                             config['cell_size']*3,
                             self.height*config['cell_size']),0)
 
+    #Senses input for block movement
     def move(self, delta_x):
         if not self.gameover and not self.paused:
             new_x = self.stone_x + delta_x
@@ -183,11 +196,14 @@ class TetrisApp(object):
                                    self.stone,
                                    (new_x, self.stone_y)):
                 self.stone_x = new_x
+    #Quit function if correct input is entered
     def quit(self):
         self.center_msg("Exiting...")
         pygame.display.update()
         sys.exit()
 
+    #Occurs either when a timeout happens for the block to fall or if a player hits the down arrow.
+    #It drops the current block and checks for collision. Also detects if any row is full.
     def drop(self):
         if not self.gameover and not self.paused:
             self.stone_y += 1
@@ -208,6 +224,7 @@ class TetrisApp(object):
                     else:
                         break
 
+    #Rotates a block with helper method 'rotate_clockwise'
     def rotate_stone(self):
         if not self.gameover and not self.paused:
             new_stone = rotate_clockwise(self.stone)
@@ -216,16 +233,20 @@ class TetrisApp(object):
                                    (self.stone_x, self.stone_y)):
                 self.stone = new_stone
 
+    #Allows pausing (if we impliment a single player mode)
     def toggle_pause(self):
         self.paused = not self.paused
 
+    #Initialize game
     def start_game(self):
         if self.gameover:
             self.init_game()
             self.gameover = False
 
-    def run(self):
-        key_actions = {
+    #This function does the main work of the program. It contains the wile loop that updates the board.
+    #It also handles all Server requests for information about its board and the opponent's board. 
+    def run(self): 
+        key_actions = { #Specifies movements and inputs
             'ESCAPE':   self.quit,
             'LEFT':     lambda:self.move(-1),
             'RIGHT':    lambda:self.move(+1),
@@ -238,8 +259,8 @@ class TetrisApp(object):
         self.gameover = False
         self.paused = False
         if playerStatus == 'host':
-            pygame.display.set_caption('Host Game')
-            self.endStatus = 'joinwin'
+            pygame.display.set_caption('Host Game') #Labels game window
+            self.endStatus = 'joinwin' #Will send this message if it loses
         elif playerStatus == 'join':
             pygame.display.set_caption('Join Game')
             self.endStatus = 'hostwin'
@@ -247,42 +268,43 @@ class TetrisApp(object):
         pygame.time.set_timer(pygame.USEREVENT+1, config['delay'])
         dont_burn_my_cpu = pygame.time.Clock()
         while 1:
-            self.screen.fill((0,0,0))
+            self.screen.fill((0,0,0)) #Restarts board every time
             if self.gameover:
                 self.center_msg("""Game Over!
- {}""".format(self.endStatus))
+ {}""".format(self.endStatus)) #Ends game and displays who won
             else:
                 if self.paused:
                     self.center_msg("Paused")
                 else:
-                    self.draw_matrix(self.board, (0,0))
+                    self.draw_matrix(self.board, (0,0)) #Draws current board (all open spaces and set blocks)
                     self.draw_matrix(self.stone,
                                      (self.stone_x,
-                                      self.stone_y))
+                                      self.stone_y)) #Draw current moving block
+                    #This request sends all data about this players current board and moving stone.
                     r = requests.post(URL, "Info _" + playerStatus + "_" + str(self.board) + "_" + str(self.stone) + "_" + str(self.stone_x) + "_" + str(self.stone_y))
+                    #Opponent's board and stone are sent back in response to our post request
                     opponent = json.loads(r.text)
-                    if isinstance(opponent["board"], str):
+                    if isinstance(opponent["board"], str): #Check to make sure it's not the first turn and board is not empty
                         newBoard = ast.literal_eval(opponent["board"])
                         newStone = ast.literal_eval(opponent["stone"])
-                        self.draw_matrix(newBoard, (11,0))
-                        self.draw_matrix(newStone, ((int(opponent["stone_x"])+3+8),(int(opponent["stone_y"]))))
-                    q = requests.get(URL)
-            #print(q.text == 'none')
-                    if not q.text == 'none':
+                        self.draw_matrix(newBoard, (11,0)) #Draw Opponent's board
+                        self.draw_matrix(newStone, ((int(opponent["stone_x"])+3+8),(int(opponent["stone_y"])))) #Draw Opponent's stone
+                    q = requests.get(URL) #Checks gameover status of other player
+                    if not q.text == 'none': #If response is anything but 'none' the other player has lost
                         self.endStatus = q.text
                         self.gameover = True
-            pygame.display.update()
+            pygame.display.update() #Update display with all drawn figures
 
             for event in pygame.event.get():
-                if event.type == pygame.USEREVENT+1:
+                if event.type == pygame.USEREVENT+1: #If a timeout of the drop occurs, drop it.
                     self.drop()
-                elif event.type == pygame.QUIT:
+                elif event.type == pygame.QUIT: #If user quits, quit.
                     self.quit()
-                elif event.type == pygame.KEYDOWN:
+                elif event.type == pygame.KEYDOWN: #Checks what key was pressed.
                     for key in key_actions:
                         if event.key == eval("pygame.K_"
                         +key):
-                            key_actions[key]()
+                            key_actions[key]()#Marks which action to take for current block
 
             dont_burn_my_cpu.tick(config['maxfps'])
 
